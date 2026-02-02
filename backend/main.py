@@ -312,6 +312,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pdf2image import convert_from_bytes
 from pathlib import Path
+from fastapi.responses import JSONResponse
+import asyncio
 from dotenv import load_dotenv  # <-- Add this
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -393,13 +395,22 @@ async def index():
 async def extract(file: UploadFile = File(...)):
     try:
         pdf_bytes = await file.read()
-        images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
-        page = images[0]
+        if not pdf_bytes:
+            return JSONResponse({"status": "error", "error": "Empty file"}, status_code=400)
 
+        # Convert PDF to image (only first page)
+        try:
+            images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
+            page = images[0]
+        except Exception as pdf_err:
+            return JSONResponse({"status": "error", "error": f"PDF conversion failed: {pdf_err}"}, status_code=500)
+
+        # Convert image to bytes
         img_byte_arr = io.BytesIO()
         page.save(img_byte_arr, format='JPEG')
         img_bytes = img_byte_arr.getvalue()
 
+        # AI extraction with timeout
         prompt = """
         Extract the main Arabic text from this image while following these rules:
         1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
@@ -407,20 +418,20 @@ async def extract(file: UploadFile = File(...)):
         3. Correct OCR spelling errors based on Arabic context.
         4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
         """
-        
-        # Wrap AI call in try/except in case it fails
         try:
-            response = model.generate_content([
-                prompt,
-                {"mime_type": "image/jpeg", "data": img_bytes}
-            ])
-            text_content = response.text.strip()
-            words = text_content.split()
-            return {"status": "ok", "words": words, "raw_text": text_content}
+            response = await asyncio.wait_for(
+                model.generate_content([prompt, {"mime_type": "image/jpeg", "data": img_bytes}]),
+                timeout=30  # fail if it takes more than 30s
+            )
+        except asyncio.TimeoutError:
+            return JSONResponse({"status": "error", "error": "AI request timed out"}, status_code=500)
         except Exception as ai_err:
-            logger.exception("AI extraction failed")
-            return {"status": "error", "error": f"AI extraction failed: {ai_err}"}
+            return JSONResponse({"status": "error", "error": f"AI failed: {ai_err}"}, status_code=500)
+
+        text_content = response.text.strip()
+        words = text_content.split()
+        return {"status": "ok", "words": words, "raw_text": text_content}
 
     except Exception as e:
-        logger.exception("File processing failed")
-        return {"status": "error", "error": f"File processing failed: {e}"}
+        # catch-all fallback
+        return JSONResponse({"status": "error", "error": f"Unexpected error: {e}"}, status_code=500)
