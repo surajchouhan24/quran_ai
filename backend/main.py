@@ -384,8 +384,10 @@ async def index():
 #         return {"status": "error", "error": str(e)}
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
+    print("Received file for extraction...")
     try:
         pdf_bytes = await file.read()
+        print(f"PDF size: {len(pdf_bytes)} bytes")
         if not pdf_bytes:
             raise ValueError("Uploaded file is empty")
 
@@ -417,6 +419,7 @@ async def extract(file: UploadFile = File(...)):
             prompt,
             {"mime_type": "image/jpeg", "data": img_bytes}
         ])
+        print(f"Gemini Raw Response: {response.text}")
 
         if not response or not response.text:
             raise ValueError("Gemini returned empty response")
