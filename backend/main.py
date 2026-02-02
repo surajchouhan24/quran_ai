@@ -312,11 +312,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pdf2image import convert_from_bytes
 from pathlib import Path
-from fastapi.responses import JSONResponse
-import asyncio
 from dotenv import load_dotenv  # <-- Add this
-from fastapi.middleware.cors import CORSMiddleware
-
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quran_ai")
@@ -331,14 +327,6 @@ model = genai.GenerativeModel('gemini-2.5-flash')
 
 app = FastAPI(title="Hanuman Chalisa AI")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # or your frontend URL in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
@@ -347,91 +335,43 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 async def index():
     return (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
-# @app.post("/extract")
-# async def extract(file: UploadFile = File(...)):
-#     # print("Received file for extraction")
-#     try:
-#         pdf_bytes = await file.read()
-#         images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
-#         page = images[0]
-
-#         # Convert to bytes for Gemini
-#         img_byte_arr = io.BytesIO()
-#         page.save(img_byte_arr, format='JPEG')
-#         img_bytes = img_byte_arr.getvalue()
-
-#         # prompt = """
-#         # Extract the Arabic text from this image.
-#         # - Correct any OCR spelling errors based on context.
-#         # - Maintain the original verse structure (Ayaat/Couplets).
-#         # - Return ONLY the Arabic text without any explanations.
-#         # """
-#         prompt = """
-#             Extract the main Arabic text from this image while following these rules:
-#             1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
-#             2. Maintain the original visual structure of the verses (Ayaat/Couplets).
-#             3. Correct OCR spelling errors based on Arabic context.
-#             4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
-#         """
-#         response = model.generate_content([
-#             prompt,
-#             {"mime_type": "image/jpeg", "data": img_bytes}
-#         ])
-#         # print("Gemini response received")
-        
-#         # Clean text and split into words for the frontend's tracking logic
-#         text_content = response.text.strip()
-#         # Remove special characters but keep Hindi script
-#         words = text_content.split()
-
-#         return {"status": "ok", "words": words, "raw_text": text_content}
-
-#     except Exception as e:
-#         logger.error(f"Error: {e}")
-#         return {"status": "error", "error": str(e)}
-
-
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
     try:
         pdf_bytes = await file.read()
-        if not pdf_bytes:
-            return JSONResponse({"status": "error", "error": "Empty file"}, status_code=400)
+        images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
+        page = images[0]
 
-        # Convert PDF to image (only first page)
-        try:
-            images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
-            page = images[0]
-        except Exception as pdf_err:
-            return JSONResponse({"status": "error", "error": f"PDF conversion failed: {pdf_err}"}, status_code=500)
-
-        # Convert image to bytes
+        # Convert to bytes for Gemini
         img_byte_arr = io.BytesIO()
         page.save(img_byte_arr, format='JPEG')
         img_bytes = img_byte_arr.getvalue()
 
-        # AI extraction with timeout
+        # prompt = """
+        # Extract the Arabic text from this image.
+        # - Correct any OCR spelling errors based on context.
+        # - Maintain the original verse structure (Ayaat/Couplets).
+        # - Return ONLY the Arabic text without any explanations.
+        # """
         prompt = """
-        Extract the main Arabic text from this image while following these rules:
-        1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
-        2. Maintain the original visual structure of the verses (Ayaat/Couplets).
-        3. Correct OCR spelling errors based on Arabic context.
-        4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
+            Extract the main Arabic text from this image while following these rules:
+            1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
+            2. Maintain the original visual structure of the verses (Ayaat/Couplets).
+            3. Correct OCR spelling errors based on Arabic context.
+            4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
         """
-        try:
-            response = await asyncio.wait_for(
-                model.generate_content([prompt, {"mime_type": "image/jpeg", "data": img_bytes}]),
-                timeout=30  # fail if it takes more than 30s
-            )
-        except asyncio.TimeoutError:
-            return JSONResponse({"status": "error", "error": "AI request timed out"}, status_code=500)
-        except Exception as ai_err:
-            return JSONResponse({"status": "error", "error": f"AI failed: {ai_err}"}, status_code=500)
-
+        response = model.generate_content([
+            prompt,
+            {"mime_type": "image/jpeg", "data": img_bytes}
+        ])
+        
+        # Clean text and split into words for the frontend's tracking logic
         text_content = response.text.strip()
+        # Remove special characters but keep Hindi script
         words = text_content.split()
+
         return {"status": "ok", "words": words, "raw_text": text_content}
 
     except Exception as e:
-        # catch-all fallback
-        return JSONResponse({"status": "error", "error": f"Unexpected error: {e}"}, status_code=500)
+        logger.error(f"Error: {e}")
+        return {"status": "error", "error": str(e)}

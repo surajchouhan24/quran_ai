@@ -424,71 +424,24 @@
         }
       }
 
-      // document.getElementById("fileInput").onchange = async (e) => {
-      //   const file = e.target.files[0];
-      //   if (!file) return;
-      //   document.getElementById("loadingOverlay").classList.remove("hidden");
-      //   const fd = new FormData();
-      //   fd.append("file", file);
-      //   try {
-      //     console.log("Uploading file for extraction...");
-      //     const res = await fetch("/extract", { method: "POST", body: fd });
-
-      //     const data = await res.json();
-      //     console.log("Extract Response:", data);
-      //     if (data.status === "ok") {
-      //       docWords = data.words;
-      //       resetSession();
-      //       renderWords();
-      //       document.getElementById("micBtn").classList.remove("hidden");
-      //       document.getElementById("refreshBtn").classList.remove("hidden");
-      //     }
-      //     else {
-      //       console.log("Error: " + data.message);
-      //     }
-      //   } catch (err) {
-      //     alert("Error: " + err);
-      //   } finally {
-      //     document.getElementById("loadingOverlay").classList.add("hidden");
-      //   }
-      // };
       document.getElementById("fileInput").onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-
         document.getElementById("loadingOverlay").classList.remove("hidden");
-
         const fd = new FormData();
         fd.append("file", file);
-
         try {
-          console.log("Uploading file for extraction...");
           const res = await fetch("/extract", { method: "POST", body: fd });
-
-          let data;
-          try {
-            data = await res.json();
-          } catch (jsonErr) {
-            console.error("Failed to parse JSON:", jsonErr);
-            alert("Server returned invalid response. Please try again.");
-            return;
-          }
-
-          console.log("Extract Response:", data);
-
+          const data = await res.json();
           if (data.status === "ok") {
             docWords = data.words;
             resetSession();
             renderWords();
             document.getElementById("micBtn").classList.remove("hidden");
             document.getElementById("refreshBtn").classList.remove("hidden");
-          } else {
-            console.error("Error from server:", data.error || data.message);
-            alert("Error: " + (data.error || "Unknown error"));
           }
         } catch (err) {
-          console.error("Fetch error:", err);
-          alert("Error uploading file: " + err.message);
+          alert("Error: " + err);
         } finally {
           document.getElementById("loadingOverlay").classList.add("hidden");
         }
