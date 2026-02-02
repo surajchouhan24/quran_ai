@@ -365,10 +365,15 @@ async def extract(file: UploadFile = File(...)):
             {"mime_type": "image/jpeg", "data": img_bytes}
         ])
         
+        print(f"Gemini Raw Response: {response.text}")
+        
         # Clean text and split into words for the frontend's tracking logic
         text_content = response.text.strip()
         # Remove special characters but keep Hindi script
         words = text_content.split()
+        
+        print(f"Gemini Extracted {len(words)} words")
+        print(f"Gemini Extracted Text: {text_content}")
 
         return {"status": "ok", "words": words, "raw_text": text_content}
 
