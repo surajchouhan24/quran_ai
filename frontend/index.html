@@ -430,22 +430,39 @@
         document.getElementById("loadingOverlay").classList.remove("hidden");
         const fd = new FormData();
         fd.append("file", file);
+
         try {
           console.log("Uploading file for extraction...");
-          // const res = await fetch("/extract", { method: "POST", body: fd });
-          const res = await fetch("https://quran-ai-a4wi.onrender.com/extract", { method: "POST", body: fd });
+          const res = await fetch(
+            "https://quran-ai-a4wi.onrender.com/extract",
+            {
+              method: "POST",
+              body: fd,
+            }
+          );
 
-          console.log("Extract Response:", res);
-          const data = await res.json();
+          // Check raw text first
+          const text = await res.text();
+          console.log("Raw response text:", text);
+
+          // Only parse JSON if text exists
+          if (!text) throw new Error("Empty response from server");
+
+          const data = JSON.parse(text);
+          console.log("Parsed JSON:", data);
+
           if (data.status === "ok") {
             docWords = data.words;
             resetSession();
             renderWords();
             document.getElementById("micBtn").classList.remove("hidden");
             document.getElementById("refreshBtn").classList.remove("hidden");
+          } else {
+            throw new Error(data.error || "Extraction failed");
           }
         } catch (err) {
-          alert("Error: " + err);
+          console.error(err);
+          alert("Error: " + err.message);
         } finally {
           document.getElementById("loadingOverlay").classList.add("hidden");
         }
