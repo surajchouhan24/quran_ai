@@ -311,11 +311,18 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pdf2image import convert_from_bytes
-from fastapi import HTTPException
-
 from pathlib import Path
 from dotenv import load_dotenv  # <-- Add this
+from fastapi.middleware.cors import CORSMiddleware
+
 load_dotenv()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or your frontend URL in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quran_ai")
 api_key = os.getenv("GEMINI_API_KEY")
@@ -337,107 +344,45 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 async def index():
     return (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
-# @app.post("/extract")
-# async def extract(file: UploadFile = File(...)):
-#     try:
-#         pdf_bytes = await file.read()
-#         images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
-#         page = images[0]
-
-#         # Convert to bytes for Gemini
-#         img_byte_arr = io.BytesIO()
-#         page.save(img_byte_arr, format='JPEG')
-#         img_bytes = img_byte_arr.getvalue()
-
-#         # prompt = """
-#         # Extract the Arabic text from this image.
-#         # - Correct any OCR spelling errors based on context.
-#         # - Maintain the original verse structure (Ayaat/Couplets).
-#         # - Return ONLY the Arabic text without any explanations.
-#         # """
-#         prompt = """
-#             Extract the main Arabic text from this image while following these rules:
-#             1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
-#             2. Maintain the original visual structure of the verses (Ayaat/Couplets).
-#             3. Correct OCR spelling errors based on Arabic context.
-#             4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
-#         """
-#         response = model.generate_content([
-#             prompt,
-#             {"mime_type": "image/jpeg", "data": img_bytes}
-#         ])
-        
-#         print(f"Gemini Raw Response: {response.text}")
-        
-#         # Clean text and split into words for the frontend's tracking logic
-#         text_content = response.text.strip()
-#         # Remove special characters but keep Hindi script
-#         words = text_content.split()
-        
-#         print(f"Gemini Extracted {len(words)} words")
-#         print(f"Gemini Extracted Text: {text_content}")
-
-#         return {"status": "ok", "words": words, "raw_text": text_content}
-
-#     except Exception as e:
-#         logger.error(f"Error: {e}")
-#         return {"status": "error", "error": str(e)}
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
-    print("Received file for extraction...")
+    print("Received file for extraction")
     try:
         pdf_bytes = await file.read()
-        print(f"PDF size: {len(pdf_bytes)} bytes")
-        if not pdf_bytes:
-            raise ValueError("Uploaded file is empty")
-
-        images = convert_from_bytes(
-            pdf_bytes,
-            dpi=300,
-            first_page=1,
-            last_page=1
-        )
-
-        if not images:
-            raise ValueError("No images extracted from PDF")
-
+        images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
         page = images[0]
 
+        # Convert to bytes for Gemini
         img_byte_arr = io.BytesIO()
-        page.save(img_byte_arr, format="JPEG")
+        page.save(img_byte_arr, format='JPEG')
         img_bytes = img_byte_arr.getvalue()
 
+        # prompt = """
+        # Extract the Arabic text from this image.
+        # - Correct any OCR spelling errors based on context.
+        # - Maintain the original verse structure (Ayaat/Couplets).
+        # - Return ONLY the Arabic text without any explanations.
+        # """
         prompt = """
-        Extract the main Arabic text from this image while following these rules:
-        1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
-        2. Maintain the original visual structure of the verses (Ayaat/Couplets).
-        3. Correct OCR spelling errors based on Arabic context.
-        4. Return ONLY the main body text.
+            Extract the main Arabic text from this image while following these rules:
+            1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
+            2. Maintain the original visual structure of the verses (Ayaat/Couplets).
+            3. Correct OCR spelling errors based on Arabic context.
+            4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
         """
-
         response = model.generate_content([
             prompt,
             {"mime_type": "image/jpeg", "data": img_bytes}
         ])
-        print(f"Gemini Raw Response: {response.text}")
-
-        if not response or not response.text:
-            raise ValueError("Gemini returned empty response")
-
+        print("Gemini response received")
+        
+        # Clean text and split into words for the frontend's tracking logic
         text_content = response.text.strip()
+        # Remove special characters but keep Hindi script
         words = text_content.split()
 
-        logger.info(f"Gemini Extracted {len(words)} words")
-
-        return {
-            "status": "ok",
-            "words": words,
-            "raw_text": text_content
-        }
+        return {"status": "ok", "words": words, "raw_text": text_content}
 
     except Exception as e:
-        logger.exception("Extraction failed")
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+        logger.error(f"Error: {e}")
+        return {"status": "error", "error": str(e)}

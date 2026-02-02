@@ -432,7 +432,9 @@
         fd.append("file", file);
         try {
           console.log("Uploading file for extraction...");
-          const res = await fetch("/extract", { method: "POST", body: fd });
+          // const res = await fetch("/extract", { method: "POST", body: fd });
+          const res = await fetch("https://quran-ai-a4wi.onrender.com/extract", { method: "POST", body: fd });
+
           console.log("Extract Response:", res);
           const data = await res.json();
           if (data.status === "ok") {
