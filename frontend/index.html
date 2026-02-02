@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ar">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quran AI Assistant - Pro</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
+    />
+    <style>
+      :root {
+        --primary: #1a73e8;
+        --success: #27ae60;
+        --error: #ea4335;
+        --bg: #f8f9fa;
+        --header-bg: #2c3e50;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: var(--bg);
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .chat-wrapper {
+        width: 100%;
+        max-width: 900px;
+        height: 100dvh;
+        background: white;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+
+      @media (min-width: 768px) {
+        .chat-wrapper {
+          height: 90vh;
+          margin-top: 2vh;
+          border-radius: 15px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+      }
+
+      header {
+        background: var(--header-bg);
+        color: white;
+        padding: 15px;
+        text-align: center;
+        font-size: 1.1rem;
+        font-weight: bold;
+      }
+
+      #wordContainer {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        line-height: 2.8;
+        font-size: 1.8rem;
+        text-align: right;
+        direction: rtl;
+        background: #fff;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 12px;
+        scroll-behavior: smooth;
+      }
+
+      /* --- BLIND MODE LOGIC --- */
+      .word {
+        display: inline-block;
+        color: #bdc3c7;
+        transition: all 0.3s ease;
+        border-bottom: 3px solid transparent;
+      }
+
+      .reciting-mode .word {
+        opacity: 0;
+        border-bottom-color: transparent !important;
+      }
+
+      .reciting-mode .word.correct,
+      .reciting-mode .word.wrong {
+        opacity: 1;
+      }
+
+      .word.current {
+        border-bottom: 4px solid var(--primary);
+        color: #2c3e50;
+      }
+
+      /* Hide active cursor in reciting mode */
+      .reciting-mode .word.current {
+        opacity: 0;
+        border-bottom-color: transparent;
+      }
+
+      .word.correct {
+        color: var(--success);
+        font-weight: bold;
+      }
+      .word.wrong {
+        color: var(--error);
+        text-decoration: underline wavy;
+        font-weight: bold;
+      }
+
+      /* --- CONTROLS --- */
+      .controls {
+        padding: 15px 15px calc(15px + env(safe-area-inset-bottom)) 15px;
+        background: #f1f3f4;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        border-top: 1px solid #ddd;
+      }
+
+      .btn {
+        border: none;
+        padding: 12px 20px;
+        border-radius: 12px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: 0.2s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      @media (max-width: 767px) {
+        .btn {
+          padding: 8px 10px; /* Smaller padding for small screens */
+          font-size: 12px; /* Smaller text to prevent overflow */
+          gap: 5px; /* Tighter gap between icon and text */
+        }
+      }
+
+      .btn-upload {
+        background: var(--primary);
+        color: white;
+      }
+      .btn-mic {
+        background: var(--error);
+        color: white;
+      }
+      .btn-submit {
+        background: var(--success);
+        color: white;
+        width: 80%;
+        justify-content: center;
+      }
+      .btn-mic.active {
+        animation: pulse 1.5s infinite;
+        background: #b33939;
+      }
+
+      /* --- OVERLAYS --- */
+      #accuracy-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 25px;
+        width: 85%;
+        max-width: 400px;
+        border-radius: 15px;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.3);
+        text-align: center;
+        z-index: 1000;
+        border: 2px solid var(--primary);
+      }
+
+      #loadingOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(255, 255, 255, 0.95);
+        z-index: 10000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .loader-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+
+      .spinner {
+        width: 60px;
+        height: 60px;
+        border: 6px solid #f3f3f3;
+        border-top: 6px solid var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loadingOverlay" class="hidden">
+      <div class="loader-content">
+        <div class="spinner"></div>
+        <p>Processing PDF...</p>
+      </div>
+    </div>
+
+    <div class="chat-wrapper">
+      <header>Quran Memorization Assistant</header>
+
+      <div id="accuracy-box" class="hidden">
+        <h2 id="score-text">Accuracy: 0%</h2>
+        <p id="stats-text"></p>
+        <button
+          class="btn btn-upload"
+          onclick="closeStatsAndReset()"
+          style="margin: 0 auto"
+        >
+          Practice Again
+        </button>
+      </div>
+
+      <div id="wordContainer">
+        <div
+          style="
+            color: #95a5a6;
+            font-size: 1.2rem;
+            margin-top: 50px;
+            width: 100%;
+            text-align: center;
+          "
+        >
+          Upload a PDF to start...
+        </div>
+      </div>
+
+      <div class="controls">
+        <input
+          type="file"
+          id="fileInput"
+          class="hidden"
+          accept="application/pdf"
+        />
+
+        <button
+          id="uploadBtn"
+          class="btn btn-upload"
+          onclick="document.getElementById('fileInput').click()"
+        >
+          <span class="material-symbols-outlined">upload_file</span> Upload PDF
+        </button>
+
+        <button
+          id="micBtn"
+          class="btn btn-mic hidden"
+          onclick="toggleRecognition()"
+        >
+          <span class="material-symbols-outlined" id="micIcon">mic</span>
+          <span id="micText">Start Reciting</span>
+        </button>
+
+        <button
+          id="submitBtn"
+          class="btn btn-submit hidden"
+          onclick="stopRecitationManually()"
+        >
+          <span class="material-symbols-outlined">check_circle</span> Finish &
+          Score
+        </button>
+
+        <button
+          id="refreshBtn"
+          class="btn hidden"
+          onclick="window.location.reload()"
+          style="background: #636e72; color: white"
+        >
+          <span class="material-symbols-outlined">refresh</span> Reset
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let docWords = [];
+      let currentIndex = 0;
+      let recognition;
+      let isListening = false;
+      let wordStatusMap = new Map();
+      let lastProcessedWordCount = 0;
+
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "ar-SA";
+
+        recognition.onresult = (event) => {
+          const resultIndex = event.resultIndex;
+          const transcript = event.results[resultIndex][0].transcript.trim();
+          const wordsHeard = transcript.split(/\s+/);
+
+          if (event.results[resultIndex].isFinal) {
+            lastProcessedWordCount = 0;
+          }
+
+          for (let i = lastProcessedWordCount; i < wordsHeard.length; i++) {
+            processWordOneByOne(wordsHeard[i]);
+            lastProcessedWordCount++;
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListening) recognition.start();
+        };
+      }
+
+      function normalizeArabic(text) {
+        if (!text) return "";
+        return text
+          .replace(/[\u064B-\u0652\u06D6-\u06ED]/g, "")
+          .replace(/[إأآٱ]/g, "ا")
+          .replace(/[ىي]/g, "ي")
+          .replace(/[^\u0621-\u064A]/g, "")
+          .trim()
+          .toLowerCase();
+      }
+
+      function processWordOneByOne(spokenWord) {
+        if (currentIndex >= docWords.length) return;
+        const normalizedSpoken = normalizeArabic(spokenWord);
+        if (!normalizedSpoken) return;
+
+        while (currentIndex < docWords.length) {
+          const target = docWords[currentIndex];
+          if (target.match(/[﴿﴾\dۖۗ]/) || normalizeArabic(target) === "") {
+            currentIndex++;
+          } else {
+            break;
+          }
+        }
+
+        let foundAt = -1;
+        let lookAhead = 5;
+
+        for (let i = 0; i < lookAhead; i++) {
+          let checkIdx = currentIndex + i;
+          if (checkIdx < docWords.length) {
+            let target = normalizeArabic(docWords[checkIdx]);
+            if (
+              target === normalizedSpoken ||
+              target.includes(normalizedSpoken) ||
+              normalizedSpoken.includes(target)
+            ) {
+              foundAt = checkIdx;
+              break;
+            }
+          }
+        }
+
+        if (foundAt !== -1) {
+          for (let i = currentIndex; i < foundAt; i++) {
+            if (!wordStatusMap.has(i)) {
+              let el = document.getElementById(`word-${i}`);
+              if (el) el.className = "word wrong";
+              wordStatusMap.set(i, "wrong");
+            }
+          }
+          let currentEl = document.getElementById(`word-${foundAt}`);
+          if (currentEl) {
+            currentEl.className = "word correct";
+            wordStatusMap.set(foundAt, "correct");
+          }
+          currentIndex = foundAt + 1;
+          updateHighlight();
+        }
+      }
+
+      function updateHighlight() {
+        document
+          .querySelectorAll(".word.current")
+          .forEach((el) => el.classList.remove("current"));
+        let next = document.getElementById(`word-${currentIndex}`);
+        if (next) {
+          next.classList.add("current");
+          next.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+
+      document.getElementById("fileInput").onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        document.getElementById("loadingOverlay").classList.remove("hidden");
+        const fd = new FormData();
+        fd.append("file", file);
+        try {
+          const res = await fetch("/extract", { method: "POST", body: fd });
+          const data = await res.json();
+          if (data.status === "ok") {
+            docWords = data.words;
+            resetSession();
+            renderWords();
+            document.getElementById("micBtn").classList.remove("hidden");
+            document.getElementById("refreshBtn").classList.remove("hidden");
+          }
+        } catch (err) {
+          alert("Error: " + err);
+        } finally {
+          document.getElementById("loadingOverlay").classList.add("hidden");
+        }
+      };
+
+      function renderWords() {
+        document.getElementById("wordContainer").innerHTML = docWords
+          .map((w, i) => `<span id="word-${i}" class="word">${w}</span>`)
+          .join("");
+        updateHighlight();
+      }
+
+      function toggleRecognition() {
+        if (!isListening) {
+          // START RECITING
+          resetSession();
+          renderWords();
+          isListening = true;
+          lastProcessedWordCount = 0;
+          recognition.start();
+
+          // UI Changes
+          document
+            .getElementById("wordContainer")
+            .classList.add("reciting-mode");
+          document.getElementById("micBtn").classList.add("active");
+          document.getElementById("micText").innerText = "Listening...";
+
+          document.getElementById("submitBtn").classList.remove("hidden");
+          document.getElementById("uploadBtn").classList.add("hidden");
+          document.getElementById("refreshBtn").classList.add("hidden");
+        }
+      }
+
+      function stopRecitationManually() {
+        isListening = false;
+        recognition.stop();
+        document.getElementById("micBtn").classList.remove("active");
+        document.getElementById("micText").innerText = "Start Reciting";
+
+        document.getElementById("submitBtn").classList.add("hidden");
+        document.getElementById("uploadBtn").classList.remove("hidden");
+        document.getElementById("refreshBtn").classList.remove("hidden");
+
+        // Show Stats
+        setTimeout(showStats, 300);
+      }
+
+      function resetSession() {
+        currentIndex = 0;
+        wordStatusMap.clear();
+        lastProcessedWordCount = 0;
+        document.getElementById("accuracy-box").classList.add("hidden");
+        document
+          .getElementById("wordContainer")
+          .classList.remove("reciting-mode");
+      }
+
+      function showStats() {
+        let correct = 0,
+          wrong = 0;
+        wordStatusMap.forEach((status) =>
+          status === "correct" ? correct++ : wrong++
+        );
+        const total = correct + wrong;
+        const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+        document.getElementById(
+          "score-text"
+        ).innerText = `Accuracy: ${accuracy}%`;
+        document.getElementById(
+          "stats-text"
+        ).innerText = `✅ Correct: ${correct} | ❌ Errors: ${wrong}`;
+        document.getElementById("accuracy-box").classList.remove("hidden");
+      }
+
+      function closeStatsAndReset() {
+        resetSession();
+        renderWords(); // This renders the words visible again for study
+      }
+    </script>
+  </body>
+</html>

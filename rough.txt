@@ -1,0 +1,40 @@
+(venv) sys001@sys001-IdeaPad-Gaming-3-16IAH7:~/Desktop/ai-portfolio-suraj/quran_ai_app (main)
+$ tree -L 4
+.
+├── backend
+│   ├── main.py
+│  
+│     
+│   
+├── frontend
+│   ├── index.html
+│   ├── script.js
+│   └── style.css
+├── hanuman.py
+├── quran.py
+├── requirements.txt
+├── rough.txt
+
+
+
+sudo lsof -i :5433
+
+sudo kill -9 <PID>
+
+
+
+in my system in deffrent terminal i can run this is also
+
+uvicorn backend.main:app \
+
+  --host 0.0.0.0 \
+
+  --port 7000 \
+
+  --proxy-headers \
+
+  --forwarded-allow-ips="*"
+
+
+sudo fuser -k 8080/tcp 5433/tcp 5000/tcp
+ngrok http 7000

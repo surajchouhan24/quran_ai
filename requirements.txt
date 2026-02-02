@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+torch
+openai-whisper
+pdf2image
+pytesseract
+rapidfuzz
+numpy
+pillow
