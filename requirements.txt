@@ -6,3 +6,5 @@ pdf2image
 pytesseract
 requests
 google-generativeai
+python-dotenv
+
