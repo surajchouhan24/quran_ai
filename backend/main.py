@@ -345,45 +345,82 @@ app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 async def index():
     return (FRONTEND_DIR / "index.html").read_text(encoding="utf-8")
 
+# @app.post("/extract")
+# async def extract(file: UploadFile = File(...)):
+#     # print("Received file for extraction")
+#     try:
+#         pdf_bytes = await file.read()
+#         images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
+#         page = images[0]
+
+#         # Convert to bytes for Gemini
+#         img_byte_arr = io.BytesIO()
+#         page.save(img_byte_arr, format='JPEG')
+#         img_bytes = img_byte_arr.getvalue()
+
+#         # prompt = """
+#         # Extract the Arabic text from this image.
+#         # - Correct any OCR spelling errors based on context.
+#         # - Maintain the original verse structure (Ayaat/Couplets).
+#         # - Return ONLY the Arabic text without any explanations.
+#         # """
+#         prompt = """
+#             Extract the main Arabic text from this image while following these rules:
+#             1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
+#             2. Maintain the original visual structure of the verses (Ayaat/Couplets).
+#             3. Correct OCR spelling errors based on Arabic context.
+#             4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
+#         """
+#         response = model.generate_content([
+#             prompt,
+#             {"mime_type": "image/jpeg", "data": img_bytes}
+#         ])
+#         # print("Gemini response received")
+        
+#         # Clean text and split into words for the frontend's tracking logic
+#         text_content = response.text.strip()
+#         # Remove special characters but keep Hindi script
+#         words = text_content.split()
+
+#         return {"status": "ok", "words": words, "raw_text": text_content}
+
+#     except Exception as e:
+#         logger.error(f"Error: {e}")
+#         return {"status": "error", "error": str(e)}
+
+
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
-    print("Received file for extraction")
     try:
         pdf_bytes = await file.read()
         images = convert_from_bytes(pdf_bytes, dpi=300, first_page=1, last_page=1)
         page = images[0]
 
-        # Convert to bytes for Gemini
         img_byte_arr = io.BytesIO()
         page.save(img_byte_arr, format='JPEG')
         img_bytes = img_byte_arr.getvalue()
 
-        # prompt = """
-        # Extract the Arabic text from this image.
-        # - Correct any OCR spelling errors based on context.
-        # - Maintain the original verse structure (Ayaat/Couplets).
-        # - Return ONLY the Arabic text without any explanations.
-        # """
         prompt = """
-            Extract the main Arabic text from this image while following these rules:
-            1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
-            2. Maintain the original visual structure of the verses (Ayaat/Couplets).
-            3. Correct OCR spelling errors based on Arabic context.
-            4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
+        Extract the main Arabic text from this image while following these rules:
+        1. EXCLUDE all Headers, Footers, Page Numbers, and Marginalia.
+        2. Maintain the original visual structure of the verses (Ayaat/Couplets).
+        3. Correct OCR spelling errors based on Arabic context.
+        4. Return ONLY the main body text. No explanations, no markdown, and no layout descriptions.
         """
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "image/jpeg", "data": img_bytes}
-        ])
-        print("Gemini response received")
         
-        # Clean text and split into words for the frontend's tracking logic
-        text_content = response.text.strip()
-        # Remove special characters but keep Hindi script
-        words = text_content.split()
-
-        return {"status": "ok", "words": words, "raw_text": text_content}
+        # Wrap AI call in try/except in case it fails
+        try:
+            response = model.generate_content([
+                prompt,
+                {"mime_type": "image/jpeg", "data": img_bytes}
+            ])
+            text_content = response.text.strip()
+            words = text_content.split()
+            return {"status": "ok", "words": words, "raw_text": text_content}
+        except Exception as ai_err:
+            logger.exception("AI extraction failed")
+            return {"status": "error", "error": f"AI extraction failed: {ai_err}"}
 
     except Exception as e:
-        logger.error(f"Error: {e}")
-        return {"status": "error", "error": str(e)}
+        logger.exception("File processing failed")
+        return {"status": "error", "error": f"File processing failed: {e}"}
