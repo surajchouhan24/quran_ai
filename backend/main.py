@@ -316,13 +316,6 @@ from dotenv import load_dotenv  # <-- Add this
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # or your frontend URL in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("quran_ai")
 api_key = os.getenv("GEMINI_API_KEY")
@@ -335,6 +328,14 @@ else:
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 app = FastAPI(title="Hanuman Chalisa AI")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # or your frontend URL in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = BASE_DIR / "frontend"
